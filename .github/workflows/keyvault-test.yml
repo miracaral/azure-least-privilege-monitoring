@@ -1,0 +1,28 @@
+# Manual test: the deploy identity may read one Key Vault secret and nothing else.
+name: Key Vault least-privilege test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Read allowed and denied secrets
+        run: |
+          for secret_name in app-secret admin-secret; do
+            if az keyvault secret show --vault-name "${{ vars.VAULT_NAME }}" -n "$secret_name" --query id -o tsv > /dev/null 2> error.txt; then
+              echo "$secret_name: ALLOWED"
+            else
+              echo "$secret_name: DENIED ($(grep -o 'Forbidden\|ForbiddenByRbac' error.txt | head -1))"
+            fi
+          done
